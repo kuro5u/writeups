@@ -51,7 +51,8 @@ The only files of interest here are:
 
 The rest are files containing simple HTML and/or PHP code or static files like images/css displayed by the site. 
 
-Checking the source code of `index.php`, it executes a series of if-else type checks. The only part that could possibly be vulnerable is `include $_GET['p'] . $pageExt`, since it **includes** a file specified by the **$_GET['p']** which we control, and appends the extension **.page.php** to it. We need to check how the app sanitizes the input to contemplate our attack options.
+Checking the source code of `index.php`, it executes a series of if-else type checks. The only part that could possibly be vulnerable is `include $_GET['p'] . $pageExt`, since it **includes** a file specified by the **$_GET['p']** which we control, and appends the extension **.page.php** to it. We need to check how the app sanitizes the input to contemplate our attack options.  
+
 The file `inc/security.inc.php` which implements the **secure()** function, checks if the value of **p**:
 * **starts** with the `http://` protocol
 * **starts** with the `https://` protocol
@@ -64,9 +65,11 @@ The file `inc/security.inc.php` which implements the **secure()** function, chec
 If the input matches **any** of these regex applied filters, the app loads the default home page, otherwise it attempts to load the specified file. The sanitization is not too strict so this could be vulnerable to **LFI**.
 
 ## vulnerability
-My first thought was to try **url encoding** or **doubly url encoding** the input to include files from the server into the web page, while also adding a **null byte** `%00` at the end to trick the app into ignoring the extension added at the end of the input, but this didn't work. URL encoded characters were decoded back and doubly URL encoded characters, as well as the null byte didn't seem to work at all.
-After trying some more tricks I started testing **PHP wrappers** and different **protocols**. Many attempts later, I tried out the **data://** protocol, which got me **RCE**, verified using the `?p=data:text/plain,<?php phpinfo(); ?>` payload.
-This payload allows **URL inclusion** using the `data://` protocol, which encodes a PHP script as plain text. If the data URL is used in a PHP environment, the PHP interpreter will treat the URL as a regular PHP script and execute the code.
+My first thought was to try **url encoding** or **doubly url encoding** the input to include files from the server into the web page, while also adding a **null byte** `%00` at the end to trick the app into ignoring the extension added at the end of the input, but this didn't work. URL encoded characters were decoded back and doubly URL encoded characters, as well as the null byte didn't seem to work at all.    
+
+After trying some more tricks I started testing **PHP wrappers** and different **protocols**. Many attempts later, I tried out the **data://** protocol, which got me **RCE**, verified using the `?p=data:text/plain,<?php phpinfo(); ?>` payload.    
+
+This payload allows **URL inclusion** using the `data://` protocol, which encodes the PHP script as plain text. If the data URL is used in a PHP environment, the PHP interpreter will treat the URL as a regular PHP script and execute the code.
 
 ## exploitation
 Since the challenge doesn't involve any privesc, we only need to find the flag. I used the following payload, only changing the `cmd` each time: `https://webcompany.hax.w3challs.com/index.php?p=data:text/plain,<?php system('cmd'); ?>`.
@@ -80,7 +83,7 @@ Running the `id` command tells me I'm a nobody :/
 `ls -a` on the `yo` directory reveals a directory named `dawg`:  
 `. .. dawg .page.php`
 
-Ok I know where this is going..  
+Ok, I know where this is going..  
 
 Run `find ./yo -type f` to find all the files recursively in the `yo` directory:  
 `./yo/dawg/i/herd/you/like/flagz .page.php`
@@ -90,7 +93,7 @@ Run `find ./yo -type f` to find all the files recursively in the `yo` directory:
 
 ## patching
 
-These patches are intended for an **AD environment** and not for development. This means that they are supposed to be **quick**, **simple** and **effective**, with minimal changes to the code, and without being the most efficient options programmatically. They are also written in such a way that they don't affect the **main functionality**.
+These patches are intended for an **AD environment** and not for **development**. This means that they should be **quick**, **simple** and **effective**, with **minimal changes** to the code. They are also written in such a way that shouldn't affect the **main functionality**.
 
 ### whitelisting  
 
