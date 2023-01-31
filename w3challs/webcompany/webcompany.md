@@ -81,7 +81,7 @@ Running the `id` command tells me I'm a nobody :/
 
 Ok I know where this is going..  
 
-Run `find ./yo -type f` to find all the files recursively in the current directory:
+Run `find ./yo -type f` to find all the files recursively in the `yo` directory:
 `./yo/dawg/i/herd/you/like/flagz .page.php`
 
 `cat ./yo/dawg/i/herd/you/like/flagz` and we get the flag:
