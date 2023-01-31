@@ -66,8 +66,9 @@ If the input matches **any** of these regex applied filters, the app loads the d
 ## vulnerability
 My first thought was to try **url encoding** or **doubly url encoding** the input to include files from the server into the web page, while also adding a **null byte** `%00` at the end to trick the app into ignoring the extension added at the end of the input, but this didn't work. URL encoded characters were decoded back and doubly URL encoded characters, as well as the null byte didn't seem to work at all.
 After trying some more tricks I started testing **PHP wrappers** and different **protocols**. Many attempts later, I tried out the **data://** protocol, which got me **RCE**, verified using the `?p=data:text/plain,<?php phpinfo(); ?>` payload.
+This payload allows **URL inclusion** using the `data://` protocol, which encodes a PHP script as plain text. If the data URL is used in a PHP environment, the PHP interpreter will treat the URL as a regular PHP script and execute the code.
 
-## exploit
+## exploitation
 Since the challenge doesn't involve any privesc, we only need to find the flag. I used the following payload, only changing the `cmd` each time: `https://webcompany.hax.w3challs.com/index.php?p=data:text/plain,<?php system('cmd'); ?>`.
 
 Running the `id` command tells me I'm a nobody :/  
@@ -86,3 +87,99 @@ Run `find ./yo -type f` to find all the files recursively in the `yo` directory:
 
 `cat ./yo/dawg/i/herd/you/like/flagz` and we get the flag:  
 `W3C{d4fuck allow_url_include 1s 0n?!}`
+
+## patching
+
+These patches are intended for an **AD environment** and not for development. This means that they are supposed to be **quick**, **simple** and **effective**, with minimal changes to the code, and without being the most efficient options programmatically. They are also written in such a way that they don't affect the **main functionality**.
+
+### whitelisting  
+
+Allow only specific, secure files to be included and block everything else:  
+```php  
+<?php
+
+ob_start();
+
+// Create whitelist array
+$whitelist = array("home", "services", "contact");
+
+(include_once 'config.php') === false
+    ? die
+    : (include_once $incDir .'/'. $securityFile . $incExt) === false
+        ? die
+        : (include_once $incDir .'/'. $headerFile . $incExt) === false
+            ? die
+            : isset($_GET['p'])
+                ? is_string($_GET['p'])
+                    ? secure($_GET['p'])
+	                    ? in_array($_GET['p'], $whitelist)  
+	                        ? include $_GET['p'] . $pageExt  
+	                        : include_once 'home' . $pageExt
+	                    : include_once 'home' . $pageExt
+	                : include_once 'home' . $pageExt
+                : include_once 'home' . $pageExt;
+(include_once $incDir .'/'. $footerFile . $incExt) === false
+    ? ob_clean()
+    : null ;
+
+ob_end_flush();
+
+?>
+```
+This patch creates a **whitelist** array and checks if the file to be included is in the whitelisted files array, which are the only ones that the app needs to access through the **GET** parameter **p**. If it doesn't match any of the whitelisted files, the app includes the home page file. The secure() function could be removed here since it's useless, but I let it be to minimize the changes, since all it does is applying some filters that don't affect the logic in this case.
+
+### better sanitization
+
+Another way would be to just **filter out** all special characters from the input using **regex**:  
+```php  
+<?php
+
+if( defined('CONFIG') === false ) die;
+
+function secure($url)
+{
+    define('START',   1);
+    define('END',     2);
+    define('CONTAIN', 4);
+    define('MATCH',   8);
+
+    $filters = Array(
+        'http://'  => START,
+        'https://' => START,
+        'ftp://'   => START,
+        'ftps://'  => START,
+        'file://'  => START,
+        '/'        => START,
+        '..'       => CONTAIN
+    );
+
+    foreach ($filters AS $rule => $type)
+    {
+        $rule = preg_quote($rule);
+        switch ($type)
+        {
+            case START   : $pattern = '#^'.$rule.'#i';  break;
+            case END     : $pattern = '#'.$rule.'$#i';  break;
+            case CONTAIN : $pattern = '#'.$rule.'#i';   break;
+            case MATCH   : $pattern = '#^'.$rule.'$#i'; break;
+        }
+        if (preg_match($pattern, $url))
+            return false;
+    }
+    
+    // Remove all special characters from the file name
+    $url = preg_replace("/[^a-zA-Z0-9]+/", "", $url);
+
+    return true;
+}
+
+?>
+```  
+This patch uses **preg_replace()** to remove all the special characters. The regular expression `/[^a-zA-Z0-9]+/` matches all the characters that are **not** letters or numbers and the `+` symbol indicates that multiple characters can be matched. The second argument is the string that the matched characters will be replaced with, in this case an **empty string**. Again, this is not the best way to do this (programatically), since the original secure() function is redundant and the patch on its own would be sufficient, but there is no need to alter too much of the code that already works.
+
+### disable url inclusion
+Disable `allow_url_include` option in the `php.ini` file.
+
+The main point of the challenge, also hinted by the flag. This option determines whether URLs can be used as **include files**, which also applies to URLs that use the `data://` protocol. I didn't manage to make any other payload work, so I would assume that disabling this option would be an easy and safe quick fix.
+We would just need to add the following line in the `php.ini` file:  
+`allow_url_include = off`
