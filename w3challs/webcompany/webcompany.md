@@ -73,16 +73,16 @@ Since the challenge doesn't involve any privesc, we only need to find the flag. 
 Running the `id` command tells me I'm a nobody :/  
 `uid=65534(nobody) gid=65534(nobody) groups=65534(nobody)`
 
-`ls -a` reveals a directory named `yo`.  
+`ls -a` reveals a directory named `yo`:  
 `. .. config.php contact.page.php home.page.php inc index.php services.page.php style yo .page.php`
 
-`ls -a` on the `yo` directory reveals a directory named `dawg`:
+`ls -a` on the `yo` directory reveals a directory named `dawg`:  
 `. .. dawg .page.php`
 
 Ok I know where this is going..  
 
-Run `find ./yo -type f` to find all the files recursively in the `yo` directory:
+Run `find ./yo -type f` to find all the files recursively in the `yo` directory:  
 `./yo/dawg/i/herd/you/like/flagz .page.php`
 
-`cat ./yo/dawg/i/herd/you/like/flagz` and we get the flag:
+`cat ./yo/dawg/i/herd/you/like/flagz` and we get the flag:  
 `W3C{d4fuck allow_url_include 1s 0n?!}`
